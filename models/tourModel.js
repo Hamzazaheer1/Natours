@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 const slugify = require('slugify');
-const validator = require('validator');
+// const validator = require('validator');
 
 const tourSchema = new mongoose.Schema(
   {
@@ -11,11 +11,11 @@ const tourSchema = new mongoose.Schema(
       trim: true,
       maxlength: [40, 'A tour name must have less or equal then 40 characters'],
       minlength: [10, 'A tour name must have more or equal then 10 characters'],
-      // validate: [validator.isAlpha, 'Tour name must only contain caracters']
+      // validate: [validator.isAlpha, 'Tour name must only contain characters']
     },
     slug: String,
     duration: {
-      type: String,
+      type: Number,
       required: [true, 'A tour must have a duration'],
     },
     maxGroupSize: {
@@ -27,7 +27,7 @@ const tourSchema = new mongoose.Schema(
       required: [true, 'A tour must have a difficulty'],
       enum: {
         values: ['easy', 'medium', 'difficult'],
-        message: 'Difficulty is either: easy, medium, difficulty',
+        message: 'Difficulty is either: easy, medium, difficult',
       },
     },
     ratingsAverage: {
@@ -41,15 +41,15 @@ const tourSchema = new mongoose.Schema(
       default: 0,
     },
     price: {
-      type: String,
+      type: Number,
       required: [true, 'A tour must have a price'],
     },
     priceDiscount: {
       type: Number,
       validate: {
-        validator: function (value) {
-          // this only points to current doc on NEW documnet creation
-          return value < this.price;
+        validator: function (val) {
+          // this only points to current doc on NEW document creation
+          return val < this.price;
         },
         message: 'Discount price ({VALUE}) should be below regular price',
       },
@@ -65,7 +65,7 @@ const tourSchema = new mongoose.Schema(
     },
     imageCover: {
       type: String,
-      required: [true, 'A tour must have a image'],
+      required: [true, 'A tour must have a cover image'],
     },
     images: [String],
     createdAt: {
@@ -85,39 +85,47 @@ const tourSchema = new mongoose.Schema(
   }
 );
 
-//virtual property
 tourSchema.virtual('durationWeeks').get(function () {
   return this.duration / 7;
 });
 
-// 1 - DOCUMENT MIDDLEWARE: only run before .save() and .create()
+// DOCUMENT MIDDLEWARE: runs before .save() and .create()
 tourSchema.pre('save', function (next) {
   this.slug = slugify(this.name, { lower: true });
   next();
 });
 
-// it run after pre
-// tourSchema.post('save', function (doc, next) {
-//   this.slug = slugify(this.name, { lower: true });
+// tourSchema.pre('save', function(next) {
+//   console.log('Will save document...');
 //   next();
 // });
 
-// 2 - QUERY MIDDLEWARE
+// tourSchema.post('save', function(doc, next) {
+//   console.log(doc);
+//   next();
+// });
+
+// QUERY MIDDLEWARE
+// tourSchema.pre('find', function(next) {
 tourSchema.pre(/^find/, function (next) {
   this.find({ secretTour: { $ne: true } });
+
+  this.start = Date.now();
   next();
 });
 
-// tourSchema.post(/^find/, function (docs, next) {
-//   console.log(docs);
-//   next();
-// });
+tourSchema.post(/^find/, function (docs, next) {
+  console.log(`Query took ${Date.now() - this.start} milliseconds!`);
+  next();
+});
 
-// 3 - Aggregation Middleware
-// tourSchema.pre('aggregate', function (next) {
-//   this.pipline().unshift({ $match: { secretTour: { $ne: true } } });
-//   next();
-// });
+// AGGREGATION MIDDLEWARE
+tourSchema.pre('aggregate', function (next) {
+  this.pipeline().unshift({ $match: { secretTour: { $ne: true } } });
+
+  console.log(this.pipeline());
+  next();
+});
 
 const Tour = mongoose.model('Tour', tourSchema);
 
